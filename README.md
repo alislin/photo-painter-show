@@ -17,6 +17,8 @@ photo-painter-show/
 ├── wifi_manager.py        # WiFi控制模块
 ├── fetcher.py            # 图片下载模块
 ├── scheduler.py          # RTC调度模块
+├── power_manager.py      # INA219电源监控模块
+├── serial_manager.py     # 串口检测模块
 ├── main.py               # 主程序入口
 ├── display/              # 显示模块
 │   └── display.py       # 简化版显示脚本
@@ -76,18 +78,22 @@ mkdir -p output_dir
   "display_model": "epd7in3e",
   "work_dir": "/home/pi/photo-painter-show",
   "output_dir": "/home/pi/photo-painter-show/output_dir",
-  "display_script_path": "/home/pi/Waveshare_E-Paper/RaspberryPi_JetsonNano/python/main.py"
+  "display_script_path": "/home/pi/Waveshare_E-Paper/RaspberryPi_JetsonNano/python/main.py",
+  "log_level": "INFO",
+  "debug_mode": false
 }
 ```
 
-| 配置项 | 说明 | 必填 |
-|--------|------|------|
-| schedule | 执行时间列表 (HH:MM格式) | 是 |
-| image_url | 图片下载URL | 是 |
-| display_model | 墨水屏型号 (epd7in3e等) | 是 |
-| work_dir | 工作目录 | 是 |
-| output_dir | 图片输出目录 | 是 |
-| display_script_path | 墨水屏官方驱动脚本路径 | 否 |
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| schedule | 执行时间列表 (HH:MM格式) | - |
+| image_url | 图片下载URL | - |
+| display_model | 墨水屏型号 (epd7in3e等) | - |
+| work_dir | 工作目录 | - |
+| output_dir | 图片输出目录 | - |
+| display_script_path | 墨水屏官方驱动脚本路径 | "" |
+| log_level | 日志级别: DEBUG, INFO, WARNING, ERROR | "INFO" |
+| debug_mode | 调试模式（预留） | false |
 
 ## 使用
 
@@ -149,6 +155,63 @@ rtcwake -m off  # 系统深度休眠
 - 仅RTC模块供电，功耗极低
 - 定时时间到达后自动开机执行任务
 
+## 电源监控
+
+### INA219 电源监控芯片
+
+支持通过 INA219 芯片检测充电状态，实现智能省电：
+
+- **充电中**：执行任务后**不休眠**，保持运行状态
+- **未充电**：正常执行任务后进入深度休眠
+
+### 硬件连接
+
+INA219 默认 I2C 地址：`0x43`
+
+```
+树莓派          INA219
+-----          ------
+GPIO 2 (SDA) -> SDA
+GPIO 3 (SCL) -> SCL
+3.3V/5V     -> VCC
+GND         -> GND
+```
+
+### 安装依赖
+
+```bash
+sudo apt install python3-smbus
+pip install smbus-cffi
+```
+
+### 测试电源监控
+
+```bash
+python3 power_manager.py
+```
+
+输出示例：
+
+```
+============================================================
+INA219 电源监控测试
+============================================================
+
+PSU 电压:   5.123 V
+总线电压:   4.987 V
+分流电压:   0.136 V
+电流:       523.0 mA (充电中)
+功率:       2.607 W
+电量:       78.5%
+```
+
+### 充电状态判断
+
+| 电流方向 | 状态 |
+|----------|------|
+| 正电流 (> 0 mA) | 充电中 |
+| 负电流 (< 0 mA) | 放电中（树莓派负载） |
+
 ## 文件说明
 
 | 文件 | 功能 |
@@ -157,8 +220,10 @@ rtcwake -m off  # 系统深度休眠
 | wifi_manager.py | nmcli控制WiFi开关 |
 | fetcher.py | 下载图片到本地 |
 | scheduler.py | 计算下次执行时间的Unix时间戳 |
+| power_manager.py | INA219电源监控芯片驱动 |
+| serial_manager.py | 串口连接检测模块 |
 | main.py | 主程序，协调各模块 |
-| display_picture.py | 墨水屏显示驱动 |
+| display/display.py | 简化版墨水屏显示脚本 |
 | checklist.py | 功能检查清单（测试工具） |
 
 ## 功能测试

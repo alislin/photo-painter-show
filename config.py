@@ -46,3 +46,13 @@ def get_output_dir(config: Dict[str, Any]) -> str:
 
 def get_display_script_path(config: Dict[str, Any]) -> str:
     return config.get("display_script_path", "")
+
+
+def get_log_level(config: Dict[str, Any]) -> str:
+    """获取日志级别"""
+    return config.get("log_level", "INFO").upper()
+
+
+def is_debug_mode(config: Dict[str, Any]) -> bool:
+    """是否开启调试模式"""
+    return config.get("debug_mode", False)

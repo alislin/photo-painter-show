@@ -4,5 +4,7 @@
   "display_model": "epd7in3e",
   "work_dir": "/home/pi/photo-painter-show",
   "output_dir": "/home/pi/photo-painter-show/output_dir",
-  "display_script_path": ""
+  "display_script_path": "",
+  "log_level": "INFO",
+  "debug_mode": false
 }

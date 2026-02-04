@@ -16,6 +16,8 @@ from config import (
     get_display_model,
     get_output_dir,
     get_display_script_path,
+    get_log_level,
+    is_debug_mode,
 )
 from wifi_manager import wifi_on, wifi_off
 from fetcher import download_with_retry
@@ -24,10 +26,9 @@ from scheduler import (
     format_next_wake_time,
     calculate_sleep_duration,
 )
+from power_manager import create_power_manager
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+# 日志配置将在 main() 中根据 config 设置
 logger = logging.getLogger(__name__)
 
 IMAGE_PATH = "/tmp/latest_image.jpg"
@@ -166,42 +167,91 @@ def execute_task(config: dict) -> bool:
 
 
 def main():
-    logger.info("Photo Painter Show - Main Program Started")
-
     try:
         config = load_config()
-        logger.info(
-            f"Config loaded: schedule={get_schedule(config)}, display={get_display_model(config)}"
-        )
     except Exception as e:
-        logger.error(f"Failed to load config: {e}")
+        print(f"Failed to load config: {e}")
         sys.exit(1)
+
+    # 根据配置设置日志级别
+    log_level = getattr(logging, get_log_level(config), logging.INFO)
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+
+    logger.info("Photo Painter Show - Main Program Started")
+
+    # 初始化电源管理器
+    power_manager = create_power_manager()
+    if power_manager:
+        logger.info("INA219 power manager initialized")
+    else:
+        logger.warning("INA219 not available, skipping power detection")
+
+    logger.info(
+        f"Config loaded: schedule={get_schedule(config)}, display={get_display_model(config)}"
+    )
+
+    MAINTENANCE_CHECK_INTERVAL = 30  # 充电状态下检测间隔（秒）
+    last_charging_state = None  # 记录上一次充电状态，用于状态变化检测
 
     while True:
         try:
-            schedule_list = get_schedule(config)
-            wake_timestamp = get_next_wake_time(schedule_list)
+            # 检查充电状态
+            is_charging = False
+            if power_manager:
+                try:
+                    status = power_manager.get_status()
+                    is_charging = status["charging"]
 
-            if execute_task(config):
-                run_rtcwake(wake_timestamp)
+                    # 只在状态变化时输出日志
+                    if is_charging != last_charging_state:
+                        state_text = "charging" if is_charging else "discharging"
+                        logger.info(
+                            f"Power state changed to {state_text}: "
+                            f"voltage={status['voltage']:.3f}V, "
+                            f"current={status['current']*1000:.0f}mA"
+                        )
+                        last_charging_state = is_charging
 
-                logger.info("System suspending...")
-                sys.stdout.flush()
-                sys.stderr.flush()
+                except Exception as e:
+                    logger.warning(f"Failed to read power status: {e}")
 
-                os.system("sync")
-                os.system("systemctl suspend")
-
-                logger.info("System resumed from suspend")
-                time.sleep(5)
-
+            if is_charging:
+                # 充电状态：执行任务后不休眠，继续检测
+                logger.info("Charging mode - executing task without suspend")
+                if execute_task(config):
+                    logger.info(f"Task completed, checking again in {MAINTENANCE_CHECK_INTERVAL} seconds")
+                    time.sleep(MAINTENANCE_CHECK_INTERVAL)
+                else:
+                    logger.error("Task failed, retrying in 30 seconds")
+                    time.sleep(30)
             else:
-                logger.error("Task execution failed")
+                # 未充电：正常休眠循环
                 schedule_list = get_schedule(config)
                 wake_timestamp = get_next_wake_time(schedule_list)
-                run_rtcwake(wake_timestamp)
-                os.system("sync")
-                os.system("systemctl suspend")
+
+                if execute_task(config):
+                    run_rtcwake(wake_timestamp)
+
+                    logger.info("System suspending...")
+                    sys.stdout.flush()
+                    sys.stderr.flush()
+
+                    os.system("sync")
+                    os.system("systemctl suspend")
+
+                    logger.info("System resumed from suspend")
+                    time.sleep(5)
+
+                else:
+                    logger.error("Task execution failed")
+                    schedule_list = get_schedule(config)
+                    wake_timestamp = get_next_wake_time(schedule_list)
+                    run_rtcwake(wake_timestamp)
+                    os.system("sync")
+                    os.system("systemctl suspend")
 
         except KeyboardInterrupt:
             logger.info("Interrupted by user")

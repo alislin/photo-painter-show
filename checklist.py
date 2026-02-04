@@ -61,6 +61,15 @@ CHECKLIST = {
             ("时间戳 > 当前时间", "timestamp_check", False),
         ],
     },
+    "POWER": {
+        "name": "电源监控 (INA219)",
+        "checks": [
+            ("smbus 库可用", "import smbus", False),
+            ("power_manager.py 可导入", "import power_manager", False),
+            ("INA219 芯片检测", "ina219_detect", True),
+            ("电源状态读取", "ina219_read_status", True),
+        ],
+    },
     "DISPLAY": {
         "name": "墨水屏显示",
         "checks": [
@@ -215,6 +224,53 @@ def timestamp_check():
         return False, str(e)
 
 
+def import_smbus():
+    try:
+        import smbus
+
+        return True, None
+    except ImportError:
+        return False, "smbus 库未安装 (pip install smbus-cffi)"
+
+
+def import_power_manager():
+    try:
+        import power_manager
+
+        return hasattr(power_manager, "create_power_manager"), "create_power_manager 函数不存在"
+    except Exception as e:
+        return False, str(e)
+
+
+def ina219_detect():
+    try:
+        from power_manager import create_power_manager
+
+        pm = create_power_manager()
+        if pm is None:
+            return False, "INA219 芯片未检测到或初始化失败"
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
+def ina219_read_status():
+    try:
+        from power_manager import create_power_manager
+
+        pm = create_power_manager()
+        if pm is None:
+            return None, "INA219 不可用，跳过"
+        status = pm.get_status()
+        required_keys = ["voltage", "current", "power", "percentage", "charging"]
+        missing = [k for k in required_keys if k not in status]
+        if missing:
+            return False, f"返回数据缺少字段: {missing}"
+        return True, f"电压={status['voltage']:.2f}V, 电量={status['percentage']:.0f}%"
+    except Exception as e:
+        return False, str(e)
+
+
 def external_script_exists():
     try:
         from config import load_config
@@ -279,6 +335,10 @@ CHECK_FUNCTIONS = {
     "mock_download": mock_download,
     "scheduler_check": scheduler_check,
     "timestamp_check": timestamp_check,
+    "import smbus": import_smbus,
+    "import power_manager": import_power_manager,
+    "ina219_detect": ina219_detect,
+    "ina219_read_status": ina219_read_status,
     "file_exists display/display.py": lambda: file_exists("display/display.py"),
     "external_script_exists": external_script_exists,
     "display_script_runnable": display_script_runnable,
