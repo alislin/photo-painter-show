@@ -1,0 +1,14 @@
+[Unit]
+Description=Photo Painter Show -定时图片显示系统
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/pi/photo-painter-show/main.py
+WorkingDirectory=/home/pi/photo-painter-show
+User=pi
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
