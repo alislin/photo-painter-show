@@ -62,3 +62,18 @@ def calculate_sleep_duration(wake_timestamp: int) -> float:
     now = get_current_timestamp()
     duration = wake_timestamp - now
     return max(0, duration)
+
+
+def calculate_next_interval_wake(interval_minutes: int) -> int:
+    """计算间隔模式下的下次唤醒时间戳
+
+    Args:
+        interval_minutes: 间隔分钟数
+
+    Returns:
+        下次唤醒时间的Unix时间戳
+    """
+    now = get_current_timestamp()
+    next_wake = now + interval_minutes * 60
+    logger.info(f"Interval mode: next wake in {interval_minutes} minutes at {datetime.fromtimestamp(next_wake).strftime('%Y-%m-%d %H:%M:%S')}")
+    return next_wake

@@ -73,7 +73,9 @@ mkdir -p output_dir
 
 ```json
 {
+  "mode": "schedule",
   "schedule": ["05:00", "13:00", "18:00"],
+  "interval_minutes": 60,
   "image_url": "https://your-server/picture.jpg",
   "display_model": "epd7in3e",
   "work_dir": "/home/pi/photo-painter-show",
@@ -86,7 +88,9 @@ mkdir -p output_dir
 
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
+| mode | 运行模式: `schedule`(固定时间点) 或 `interval`(固定间隔) | "schedule" |
 | schedule | 执行时间列表 (HH:MM格式) | - |
+| interval_minutes | 间隔模式的执行间隔（分钟） | 60 |
 | image_url | 图片下载URL | - |
 | display_model | 墨水屏型号 (epd7in3e等) | - |
 | work_dir | 工作目录 | - |

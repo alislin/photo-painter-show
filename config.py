@@ -56,3 +56,13 @@ def get_log_level(config: Dict[str, Any]) -> str:
 def is_debug_mode(config: Dict[str, Any]) -> bool:
     """是否开启调试模式"""
     return config.get("debug_mode", False)
+
+
+def get_mode(config: Dict[str, Any]) -> str:
+    """获取运行模式: schedule(固定时间点) | interval(固定间隔)"""
+    return config.get("mode", "schedule")
+
+
+def get_interval_minutes(config: Dict[str, Any]) -> int:
+    """获取间隔模式的分钟数"""
+    return config.get("interval_minutes", 60)

@@ -11,7 +11,9 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from config import (
     load_config,
+    get_mode,
     get_schedule,
+    get_interval_minutes,
     get_image_url,
     get_display_model,
     get_output_dir,
@@ -25,6 +27,7 @@ from scheduler import (
     get_next_wake_time,
     format_next_wake_time,
     calculate_sleep_duration,
+    calculate_next_interval_wake,
 )
 from power_manager import create_power_manager
 
@@ -190,7 +193,8 @@ def main():
         logger.warning("INA219 not available, skipping power detection")
 
     logger.info(
-        f"Config loaded: schedule={get_schedule(config)}, display={get_display_model(config)}"
+        f"Config loaded: mode={get_mode(config)}, schedule={get_schedule(config)}, "
+        f"interval={get_interval_minutes(config)}min, display={get_display_model(config)}"
     )
 
     MAINTENANCE_CHECK_INTERVAL = 30  # 充电状态下检测间隔（秒）
@@ -228,9 +232,17 @@ def main():
                     logger.error("Task failed, retrying in 30 seconds")
                     time.sleep(30)
             else:
-                # 未充电：正常休眠循环
-                schedule_list = get_schedule(config)
-                wake_timestamp = get_next_wake_time(schedule_list)
+                # 未充电：根据模式选择调度策略
+                mode = get_mode(config)
+                if mode == "interval":
+                    # 间隔模式
+                    interval_minutes = get_interval_minutes(config)
+                    wake_timestamp = calculate_next_interval_wake(interval_minutes)
+                    logger.info(f"Interval mode: waking every {interval_minutes} minutes")
+                else:
+                    # 默认 schedule 模式（固定时间点）
+                    schedule_list = get_schedule(config)
+                    wake_timestamp = get_next_wake_time(schedule_list)
 
                 if execute_task(config):
                     run_rtcwake(wake_timestamp)
@@ -247,8 +259,13 @@ def main():
 
                 else:
                     logger.error("Task execution failed")
-                    schedule_list = get_schedule(config)
-                    wake_timestamp = get_next_wake_time(schedule_list)
+                    mode = get_mode(config)
+                    if mode == "interval":
+                        interval_minutes = get_interval_minutes(config)
+                        wake_timestamp = calculate_next_interval_wake(interval_minutes)
+                    else:
+                        schedule_list = get_schedule(config)
+                        wake_timestamp = get_next_wake_time(schedule_list)
                     run_rtcwake(wake_timestamp)
                     os.system("sync")
                     os.system("systemctl suspend")
@@ -258,8 +275,13 @@ def main():
             break
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
-            schedule_list = get_schedule(config)
-            wake_timestamp = get_next_wake_time(schedule_list)
+            mode = get_mode(config)
+            if mode == "interval":
+                interval_minutes = get_interval_minutes(config)
+                wake_timestamp = calculate_next_interval_wake(interval_minutes)
+            else:
+                schedule_list = get_schedule(config)
+                wake_timestamp = get_next_wake_time(schedule_list)
             run_rtcwake(wake_timestamp)
             os.system("sync")
             os.system("systemctl suspend")
