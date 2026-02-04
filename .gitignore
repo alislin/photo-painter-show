@@ -57,3 +57,5 @@ htmlcov/
 .venv
 
 nul
+
+.claude
