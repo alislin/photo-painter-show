@@ -18,16 +18,51 @@ photo-painter-show/
 ├── fetcher.py            # 图片下载模块
 ├── scheduler.py          # RTC调度模块
 ├── main.py               # 主程序入口
-├── display_picture.py    # 显示脚本（已存在）
+├── display/              # 显示模块
+│   └── display.py       # 简化版显示脚本
 ├── config.json           # 用户配置文件
-├── requirements.txt     # Python依赖
-└── photo-painter.service  # systemd服务
+├── requirements.txt      # Python依赖
+├── photo-painter.service # systemd服务
+├── checklist.py          # 功能检查清单
+└── docs/
+    └── PLAN.md          # 开发计划文档
 ```
 
 ## 安装
 
+### 1. 准备环境
+
 ```bash
+# 克隆或上传源码到树莓派
+cd ~
+
+# 进入项目目录
+cd photo-painter-show
+
+# 安装 Python 依赖
 pip install -r requirements.txt
+```
+
+### 2. 墨水屏驱动依赖
+
+确保已安装 Waveshare 官方驱动：
+
+```bash
+# 进入墨水屏驱动目录
+cd /home/pi/Waveshare_E-Paper/RaspberryPi_JetsonNano/python
+
+# 安装驱动依赖
+pip install -r requirements.txt
+```
+
+### 3. 文件权限
+
+```bash
+# 确保主程序可执行
+chmod +x main.py checklist.py display/display.py
+
+# 创建输出目录
+mkdir -p output_dir
 ```
 
 ## 配置
@@ -37,31 +72,62 @@ pip install -r requirements.txt
 ```json
 {
   "schedule": ["05:00", "13:00", "18:00"],
-  "image_url": "https://example.com/picture.jpg",
+  "image_url": "https://your-server/picture.jpg",
   "display_model": "epd7in3e",
   "work_dir": "/home/pi/photo-painter-show",
-  "output_dir": "/home/pi/photo-painter-show/output_dir"
+  "output_dir": "/home/pi/photo-painter-show/output_dir",
+  "display_script_path": "/home/pi/Waveshare_E-Paper/RaspberryPi_JetsonNano/python/main.py"
 }
 ```
 
-| 配置项 | 说明 |
-|-------|------|
-| schedule | 执行时间列表 (HH:MM格式) |
-| image_url | 图片下载URL |
-| display_model | 墨水屏型号 (epd7in3e等) |
-| work_dir | 工作目录 |
-| output_dir | 图片输出目录 |
+| 配置项 | 说明 | 必填 |
+|--------|------|------|
+| schedule | 执行时间列表 (HH:MM格式) | 是 |
+| image_url | 图片下载URL | 是 |
+| display_model | 墨水屏型号 (epd7in3e等) | 是 |
+| work_dir | 工作目录 | 是 |
+| output_dir | 图片输出目录 | 是 |
+| display_script_path | 墨水屏官方驱动脚本路径 | 否 |
 
 ## 使用
 
-```bash
-# 手动运行测试
-python3 main.py
+### 手动运行测试
 
-# 设置开机自启
-sudo cp photo-painter.service /etc/systemd/system/
-sudo systemctl enable photo-painter.service
+```bash
+# 模拟模式测试（无需硬件）
+python3 checklist.py --simulate
+
+# 真实硬件测试（在树莓派上执行）
+python3 checklist.py --hardware
+
+# 手动运行一次任务
+python3 main.py
 ```
+
+### 安装系统服务
+
+```bash
+# 复制服务文件
+sudo cp photo-painter.service /etc/systemd/system/
+
+# 启用开机自启
+sudo systemctl enable photo-painter.service
+
+# 启动服务
+sudo systemctl start photo-painter.service
+```
+
+### 服务管理命令
+
+| 命令 | 说明 |
+|------|------|
+| `sudo systemctl start photo-painter` | 启动服务 |
+| `sudo systemctl stop photo-painter` | 停止服务 |
+| `sudo systemctl restart photo-painter` | 重启服务 |
+| `sudo systemctl status photo-painter` | 查看服务状态 |
+| `sudo systemctl enable photo-painter` | 启用开机自启 |
+| `sudo systemctl disable photo-painter` | 禁用开机自启 |
+| `journalctl -u photo-painter -f` | 实时查看日志 |
 
 ## 工作流程
 
