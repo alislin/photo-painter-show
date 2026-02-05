@@ -16,7 +16,7 @@ def load_config(config_path: str | None = None) -> Dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
 
-    required_keys = ["schedule", "image_url", "display_model", "work_dir", "output_dir"]
+    required_keys = ["schedule", "image_url", "display_model", "output_dir"]
     for key in required_keys:
         if key not in config:
             raise ValueError(f"Missing required config key: {key}")
@@ -34,10 +34,6 @@ def get_image_url(config: Dict[str, Any]) -> str:
 
 def get_display_model(config: Dict[str, Any]) -> str:
     return config.get("display_model", "")
-
-
-def get_work_dir(config: Dict[str, Any]) -> str:
-    return config.get("work_dir", "")
 
 
 def get_output_dir(config: Dict[str, Any]) -> str:
