@@ -213,6 +213,7 @@ python3 display/display.py image.jpg -m epd7in3e -d /path/to/lib
 
 - **充电中**：执行任务后**不休眠**，保持运行状态
 - **未充电**：正常执行任务后进入深度休眠
+- **无 INA219**：默认进入维护模式，防止休眠后无法唤醒
 
 ### 硬件连接
 

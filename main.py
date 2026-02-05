@@ -326,7 +326,7 @@ def main():
     while True:
         try:
             # 检查充电状态
-            is_charging = False
+            is_charging = True  # 默认维护模式，防止无电源硬件时休眠无法唤醒
             if power_manager:
                 try:
                     status = power_manager.get_status()
@@ -344,6 +344,13 @@ def main():
 
                 except Exception as e:
                     logger.warning(f"Failed to read power status: {e}")
+            else:
+                # 无 INA219 硬件，默认进入维护模式
+                if last_charging_state is not None:
+                    logger.info(
+                        "No power manager - maintenance mode enabled by default"
+                    )
+                last_charging_state = False  # 标记已输出过日志
 
             if is_charging:
                 # 充电状态：执行任务后不休眠，继续检测

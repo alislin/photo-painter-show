@@ -453,7 +453,22 @@ class PowerTracker:
             with open(self.log_file, "r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    records.append(PowerRecord(**row))
+                    try:
+                        row["task_id"] = int(row.get("task_id", 0))
+                        row["start_percentage"] = float(row.get("start_percentage", 0))
+                        row["end_percentage"] = float(row.get("end_percentage", 0))
+                        row["net_consumption"] = float(row.get("net_consumption", 0))
+                        row["start_voltage"] = float(row.get("start_voltage", 0))
+                        row["end_voltage"] = float(row.get("end_voltage", 0))
+                        row["avg_power"] = float(row.get("avg_power", 0))
+                        row["max_power"] = float(row.get("max_power", 0))
+                        row["min_power"] = float(row.get("min_power", 0))
+                        row["task_duration"] = float(row.get("task_duration", 0))
+                        row["charging"] = row.get("charging", "False") == "True"
+                        row["current_ma"] = float(row.get("current_ma", 0))
+                        records.append(PowerRecord(**row))
+                    except (ValueError, KeyError) as e:
+                        logger.warning(f"Skipping invalid record: {e}")
         except Exception as e:
             logger.warning(f"Failed to read power log: {e}")
 
