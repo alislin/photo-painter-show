@@ -93,6 +93,15 @@ CHECKLIST = {
             ("systemctl 可用", "command_exists systemctl", True),
         ],
     },
+    "TIME_SYNC": {
+        "name": "时间同步 (chrony)",
+        "checks": [
+            ("chronyc 可用", "command_exists chronyc", True),
+            ("time_sync 模块导入", "import time_sync", False),
+            ("开机同步测试", "time_sync_boot", True),
+            ("RTC 同步测试", "time_sync_rtc", True),
+        ],
+    },
 }
 
 
@@ -237,7 +246,9 @@ def import_power_manager():
     try:
         import power_manager
 
-        return hasattr(power_manager, "create_power_manager"), "create_power_manager 函数不存在"
+        return hasattr(
+            power_manager, "create_power_manager"
+        ), "create_power_manager 函数不存在"
     except Exception as e:
         return False, str(e)
 
@@ -323,6 +334,43 @@ def execute_task_exists():
         return False, str(e)
 
 
+def import_time_sync():
+    try:
+        import time_sync
+
+        return hasattr(
+            time_sync, "sync_time_with_chrony"
+        ), "sync_time_with_chrony 函数不存在"
+    except Exception as e:
+        return False, str(e)
+
+
+def time_sync_boot():
+    try:
+        from time_sync import sync_time_with_chrony
+
+        success, msg = sync_time_with_chrony(timeout=10)
+        if success:
+            return True, msg
+        else:
+            return False, msg
+    except Exception as e:
+        return False, str(e)
+
+
+def time_sync_rtc():
+    try:
+        from time_sync import sync_system_to_rtc
+
+        success, msg = sync_system_to_rtc()
+        if success:
+            return True, msg
+        else:
+            return False, msg
+    except Exception as e:
+        return False, str(e)
+
+
 CHECK_FUNCTIONS = {
     "file_exists": lambda: file_exists("config.json"),
     "json_valid": json_valid,
@@ -347,6 +395,10 @@ CHECK_FUNCTIONS = {
     "command_exists python3": lambda: command_exists("python3"),
     "command_exists rtcwake": lambda: command_exists("rtcwake"),
     "command_exists systemctl": lambda: command_exists("systemctl"),
+    "command_exists chronyc": lambda: command_exists("chronyc"),
+    "import time_sync": import_time_sync,
+    "time_sync_boot": time_sync_boot,
+    "time_sync_rtc": time_sync_rtc,
 }
 
 

@@ -10,5 +10,9 @@
   "log_level": "INFO",
   "debug_mode": false,
   "allow_wifi_off": false,
-  "rotate_display": true
+  "rotate_display": true,
+  "enable_time_sync": true,
+  "sync_timeout": 30,
+  "sync_on_boot": true,
+  "sync_before_suspend": true
 }

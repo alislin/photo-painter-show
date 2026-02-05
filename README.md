@@ -147,11 +147,15 @@ sudo systemctl start photo-painter.service
 ```
 RTC闹钟触发 → 系统启动
     ↓
+[时间同步] chrony 同步网络时间 (可选)
+    ↓
 读取配置
     ↓
 WiFi开 → 下载图片 → [WiFi关]  (根据 allow_wifi_off 配置)
     ↓
 调用显示脚本
+    ↓
+[同步到 RTC] 系统时间写入硬件时钟 (可选)
     ↓
 rtcwake -m off  # 系统深度休眠
 ```
@@ -256,6 +260,54 @@ PSU 电压:   5.123 V
 | 正电流 (> 0 mA) | 充电中 |
 | 负电流 (< 0 mA) | 放电中（树莓派负载） |
 
+## 时间同步
+
+### chrony 时间同步
+
+支持使用 chrony 进行 NTP 时间同步，确保系统时间准确：
+
+- **开机同步**：程序启动时自动同步网络时间
+- **休眠前同步**：进入休眠前将系统时间写入 RTC 硬件时钟
+
+### 安装 chrony
+
+```bash
+sudo apt install chrony
+sudo systemctl enable chrony
+sudo systemctl start chrony
+```
+
+### 配置项
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| `enable_time_sync` | 是否启用时间同步 | `true` |
+| `sync_timeout` | 同步超时时间（秒） | `30` |
+| `sync_on_boot` | 开机时同步网络时间 | `true` |
+| `sync_before_suspend` | 休眠前同步到 RTC | `true` |
+
+```json
+{
+  "enable_time_sync": true,
+  "sync_timeout": 30,
+  "sync_on_boot": true,
+  "sync_before_suspend": true
+}
+```
+
+### 手动测试
+
+```bash
+# 查看 chrony 状态
+chronyc tracking
+
+# 强制同步
+sudo chronyc makestep
+
+# 检查 RTC 时间
+sudo hwclock -r
+```
+
 ## 文件说明
 
 | 文件 | 功能 |
@@ -265,6 +317,7 @@ PSU 电压:   5.123 V
 | fetcher.py | 下载图片到本地 |
 | scheduler.py | 计算下次执行时间的Unix时间戳 |
 | power_manager.py | INA219电源监控芯片驱动 |
+| time_sync.py | chrony时间同步模块 |
 | serial_manager.py | 串口连接检测模块 |
 | main.py | 主程序，协调各模块 |
 | display/display.py | 简化版墨水屏显示脚本 |
@@ -341,6 +394,8 @@ python3 checklist.py --hardware
 | WIFI | nmcli可用性、WiFi开关函数 | 硬件 |
 | FETCHER | requests库、下载函数、模拟下载测试 | 模拟 |
 | SCHEDULER | 时间计算函数有效性 | 模拟 |
+| POWER | INA219芯片检测、电源状态读取 | 硬件 |
 | DISPLAY | 显示脚本存在性、可执行性 | 混合 |
 | MAIN | 主程序导入、函数存在性 | 模拟 |
 | SYSTEM | Python3、rtcwake、systemctl可用性 | 硬件 |
+| TIME_SYNC | chronyc可用性、时间同步函数 | 硬件 |

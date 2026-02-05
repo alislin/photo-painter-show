@@ -81,3 +81,23 @@ def get_allow_wifi_off(config: Dict[str, Any]) -> bool:
 def get_rotate_display(config: Dict[str, Any]) -> bool:
     """是否旋转180度显示"""
     return config.get("rotate_display", False)
+
+
+def get_enable_time_sync(config: Dict[str, Any]) -> bool:
+    """是否启用时间同步"""
+    return config.get("enable_time_sync", True)
+
+
+def get_sync_timeout(config: Dict[str, Any]) -> int:
+    """时间同步超时时间（秒）"""
+    return config.get("sync_timeout", 30)
+
+
+def get_sync_on_boot(config: Dict[str, Any]) -> bool:
+    """是否在开机时同步时间"""
+    return config.get("sync_on_boot", True)
+
+
+def get_sync_before_suspend(config: Dict[str, Any]) -> bool:
+    """是否在休眠前同步到RTC"""
+    return config.get("sync_before_suspend", True)

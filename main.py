@@ -23,6 +23,10 @@ from config import (
     is_debug_mode,
     get_allow_wifi_off,
     get_rotate_display,
+    get_enable_time_sync,
+    get_sync_timeout,
+    get_sync_on_boot,
+    get_sync_before_suspend,
 )
 from wifi_manager import wifi_on, wifi_off
 from fetcher import download_with_retry
@@ -33,6 +37,7 @@ from scheduler import (
     calculate_next_interval_wake,
 )
 from power_manager import create_power_manager
+from time_sync import sync_time_with_chrony, sync_system_to_rtc
 
 # 日志配置将在 main() 中根据 config 设置
 logger = logging.getLogger(__name__)
@@ -78,10 +83,10 @@ def call_display_script(
 
         # 输出子进程日志
         if result_simplified.stdout:
-            for line in result_simplified.stdout.strip().split('\n'):
+            for line in result_simplified.stdout.strip().split("\n"):
                 logger.info(f"[display] {line}")
         if result_simplified.stderr:
-            for line in result_simplified.stderr.strip().split('\n'):
+            for line in result_simplified.stderr.strip().split("\n"):
                 logger.warning(f"[display] {line}")
 
         if result_simplified.returncode == 0:
@@ -117,10 +122,10 @@ def call_display_script(
 
         # 输出子进程日志
         if result_external.stdout:
-            for line in result_external.stdout.strip().split('\n'):
+            for line in result_external.stdout.strip().split("\n"):
                 logger.info(f"[display] {line}")
         if result_external.stderr:
-            for line in result_external.stderr.strip().split('\n'):
+            for line in result_external.stderr.strip().split("\n"):
                 logger.warning(f"[display] {line}")
 
         if result_external.returncode == 0:
@@ -223,16 +228,25 @@ def main():
     handlers = [logging.StreamHandler()]
     if log_file:
         from pathlib import Path
+
         Path(log_file).parent.mkdir(parents=True, exist_ok=True)
         handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
 
     logging.basicConfig(
         level=log_level,
         format="%(asctime)s - %(levelname)s - %(message)s",
-        handlers=handlers
+        handlers=handlers,
     )
 
     logger.info("Photo Painter Show - Main Program Started")
+
+    if get_enable_time_sync(config) and get_sync_on_boot(config):
+        logger.info("正在同步网络时间...")
+        success, msg = sync_time_with_chrony(get_sync_timeout(config))
+        if success:
+            logger.info(f"开机时间同步成功: {msg}")
+        else:
+            logger.warning(f"开机时间同步失败: {msg}, 继续运行")
 
     # 初始化电源管理器
     power_manager = create_power_manager()
@@ -264,7 +278,7 @@ def main():
                         logger.info(
                             f"Power state changed to {state_text}: "
                             f"voltage={status['voltage']:.3f}V, "
-                            f"current={status['current']*1000:.0f}mA"
+                            f"current={status['current'] * 1000:.0f}mA"
                         )
                         last_charging_state = is_charging
 
@@ -275,7 +289,9 @@ def main():
                 # 充电状态：执行任务后不休眠，继续检测
                 logger.info("Charging mode - executing task without suspend")
                 if execute_task(config):
-                    logger.info(f"Task completed, checking again in {MAINTENANCE_CHECK_INTERVAL} seconds")
+                    logger.info(
+                        f"Task completed, checking again in {MAINTENANCE_CHECK_INTERVAL} seconds"
+                    )
                     time.sleep(MAINTENANCE_CHECK_INTERVAL)
                 else:
                     logger.error("Task failed, retrying in 30 seconds")
@@ -287,7 +303,9 @@ def main():
                     # 间隔模式
                     interval_minutes = get_interval_minutes(config)
                     wake_timestamp = calculate_next_interval_wake(interval_minutes)
-                    logger.info(f"Interval mode: waking every {interval_minutes} minutes")
+                    logger.info(
+                        f"Interval mode: waking every {interval_minutes} minutes"
+                    )
                 else:
                     # 默认 schedule 模式（固定时间点）
                     schedule_list = get_schedule(config)
@@ -299,6 +317,14 @@ def main():
                     logger.info("System suspending...")
                     sys.stdout.flush()
                     sys.stderr.flush()
+
+                    if get_sync_before_suspend(config):
+                        logger.info("正在同步系统时间到 RTC...")
+                        sync_success, sync_msg = sync_system_to_rtc()
+                        if sync_success:
+                            logger.info(f"RTC 同步成功: {sync_msg}")
+                        else:
+                            logger.warning(f"RTC 同步失败: {sync_msg}, 继续休眠")
 
                     os.system("sync")
                     os.system("systemctl suspend")
@@ -316,6 +342,15 @@ def main():
                         schedule_list = get_schedule(config)
                         wake_timestamp = get_next_wake_time(schedule_list)
                     run_rtcwake(wake_timestamp)
+
+                    if get_sync_before_suspend(config):
+                        logger.info("正在同步系统时间到 RTC...")
+                        sync_success, sync_msg = sync_system_to_rtc()
+                        if sync_success:
+                            logger.info(f"RTC 同步成功: {sync_msg}")
+                        else:
+                            logger.warning(f"RTC 同步失败: {sync_msg}, 继续休眠")
+
                     os.system("sync")
                     os.system("systemctl suspend")
 
@@ -332,6 +367,15 @@ def main():
                 schedule_list = get_schedule(config)
                 wake_timestamp = get_next_wake_time(schedule_list)
             run_rtcwake(wake_timestamp)
+
+            if get_sync_before_suspend(config):
+                logger.info("正在同步系统时间到 RTC...")
+                sync_success, sync_msg = sync_system_to_rtc()
+                if sync_success:
+                    logger.info(f"RTC 同步成功: {sync_msg}")
+                else:
+                    logger.warning(f"RTC 同步失败: {sync_msg}, 继续休眠")
+
             os.system("sync")
             os.system("systemctl suspend")
 
