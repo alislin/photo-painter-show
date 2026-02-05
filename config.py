@@ -101,3 +101,13 @@ def get_sync_on_boot(config: Dict[str, Any]) -> bool:
 def get_sync_before_suspend(config: Dict[str, Any]) -> bool:
     """是否在休眠前同步到RTC"""
     return config.get("sync_before_suspend", True)
+
+
+def get_enable_power_tracking(config: Dict[str, Any]) -> bool:
+    """是否启用电量追踪"""
+    return config.get("enable_power_tracking", True)
+
+
+def get_power_log_file(config: Dict[str, Any]) -> str:
+    """获取电量日志文件路径"""
+    return config.get("power_log_file", "power_log.csv")

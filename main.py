@@ -27,6 +27,8 @@ from config import (
     get_sync_timeout,
     get_sync_on_boot,
     get_sync_before_suspend,
+    get_enable_power_tracking,
+    get_power_log_file,
 )
 from wifi_manager import wifi_on, wifi_off
 from fetcher import download_with_retry
@@ -36,7 +38,7 @@ from scheduler import (
     calculate_sleep_duration,
     calculate_next_interval_wake,
 )
-from power_manager import create_power_manager
+from power_manager import create_power_manager, create_power_tracker
 from time_sync import sync_time_with_chrony, sync_system_to_rtc
 
 # 日志配置将在 main() 中根据 config 设置
@@ -176,7 +178,7 @@ def run_rtcwake(wake_timestamp: int) -> bool:
         return False
 
 
-def execute_task(config: dict) -> bool:
+def execute_task(config: dict, power_manager=None, power_tracker=None) -> bool:
     logger.info("=" * 50)
     logger.info("Starting task execution")
     logger.info("=" * 50)
@@ -188,9 +190,27 @@ def execute_task(config: dict) -> bool:
 
     os.makedirs(output_dir, exist_ok=True)
 
+    charging_state = False
+    if power_manager:
+        try:
+            charging_state = power_manager.is_charging()
+        except:
+            pass
+
+    # 开始电量追踪
+    if power_tracker:
+        power_tracker.start_task(power_manager)
+        logger.info(f"Power tracking started (charging: {charging_state})")
+
     if not wifi_on():
         logger.error("Failed to enable WiFi")
+        if power_tracker:
+            power_tracker.end_task(power_manager, charging=charging_state)
         return False
+
+    # WiFi 开启后采样
+    if power_tracker:
+        power_tracker.sample_power(power_manager, "wifi_on")
 
     if not download_with_retry(image_url, IMAGE_PATH, max_retries=3):
         logger.error("Failed to download image")
@@ -198,7 +218,13 @@ def execute_task(config: dict) -> bool:
             wifi_off()
         else:
             logger.info("WiFi keep-alive: skipping WiFi off")
+        if power_tracker:
+            power_tracker.end_task(power_manager, charging=charging_state)
         return False
+
+    # 下载完成后采样
+    if power_tracker:
+        power_tracker.sample_power(power_manager, "download_complete")
 
     if allow_wifi_off:
         if not wifi_off():
@@ -206,9 +232,27 @@ def execute_task(config: dict) -> bool:
     else:
         logger.info("WiFi keep-alive mode enabled")
 
+    # WiFi 关闭后采样
+    if power_tracker:
+        power_tracker.sample_power(power_manager, "wifi_off")
+
     if not call_display_script(display_model, IMAGE_PATH, output_dir, config):
         logger.error("Failed to display image")
+        if power_tracker:
+            power_tracker.end_task(power_manager, charging=charging_state)
         return False
+
+    # 显示完成后采样并结束追踪
+    if power_tracker:
+        power_tracker.sample_power(power_manager, "display_complete")
+        record = power_tracker.end_task(power_manager, charging=charging_state)
+        if record:
+            logger.info(
+                f"Task #{record.task_id} power summary: "
+                f"{record.net_consumption:.1f}% consumed, "
+                f"avg {record.avg_power:.2f}W, "
+                f"duration {record.task_duration:.1f}s"
+            )
 
     logger.info("Task execution completed successfully")
     return True
@@ -255,6 +299,22 @@ def main():
     else:
         logger.warning("INA219 not available, skipping power detection")
 
+    # 初始化电量追踪器
+    power_tracker = None
+    if get_enable_power_tracking(config):
+        power_log_file = get_power_log_file(config)
+        if not os.path.isabs(power_log_file):
+            power_log_file = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), power_log_file
+            )
+        try:
+            power_tracker = create_power_tracker(power_log_file)
+            logger.info(f"Power tracker initialized: {power_log_file}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize power tracker: {e}")
+    else:
+        logger.info("Power tracking disabled")
+
     logger.info(
         f"Config loaded: mode={get_mode(config)}, schedule={get_schedule(config)}, "
         f"interval={get_interval_minutes(config)}min, display={get_display_model(config)}"
@@ -288,7 +348,7 @@ def main():
             if is_charging:
                 # 充电状态：执行任务后不休眠，继续检测
                 logger.info("Charging mode - executing task without suspend")
-                if execute_task(config):
+                if execute_task(config, power_manager, power_tracker):
                     logger.info(
                         f"Task completed, checking again in {MAINTENANCE_CHECK_INTERVAL} seconds"
                     )
@@ -311,7 +371,7 @@ def main():
                     schedule_list = get_schedule(config)
                     wake_timestamp = get_next_wake_time(schedule_list)
 
-                if execute_task(config):
+                if execute_task(config, power_manager, power_tracker):
                     run_rtcwake(wake_timestamp)
 
                     logger.info("System suspending...")

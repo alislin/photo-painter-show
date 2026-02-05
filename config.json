@@ -14,5 +14,7 @@
   "enable_time_sync": true,
   "sync_timeout": 30,
   "sync_on_boot": true,
-  "sync_before_suspend": true
+  "sync_before_suspend": true,
+  "enable_power_tracking": true,
+  "power_log_file": "power_log.csv"
 }
