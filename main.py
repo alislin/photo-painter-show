@@ -19,7 +19,10 @@ from config import (
     get_output_dir,
     get_display_script_path,
     get_log_level,
+    get_log_file,
     is_debug_mode,
+    get_allow_wifi_off,
+    get_rotate_display,
 )
 from wifi_manager import wifi_on, wifi_off
 from fetcher import download_with_retry
@@ -43,7 +46,13 @@ def call_display_script(
     script_dir = os.path.dirname(os.path.abspath(__file__))
     simplified_script = os.path.join(script_dir, "display", "display.py")
 
-    logger.info("Trying simplified display script")
+    # 从 display_script_path 推断驱动路径
+    external_script = get_display_script_path(config)
+    if external_script:
+        driver_path = os.path.join(os.path.dirname(external_script), "..", "lib")
+    else:
+        driver_path = None
+
     cmd_simplified = [
         sys.executable,
         simplified_script,
@@ -53,11 +62,27 @@ def call_display_script(
         "-o",
         output_dir,
     ]
+    if driver_path:
+        cmd_simplified.extend(["-d", driver_path])
+
+    # 检查是否需要旋转
+    rotate_display = get_rotate_display(config)
+    if rotate_display:
+        cmd_simplified.append("-r")
 
     try:
+        logger.info("Trying simplified display script")
         result_simplified = subprocess.run(
             cmd_simplified, capture_output=True, text=True, timeout=300
         )
+
+        # 输出子进程日志
+        if result_simplified.stdout:
+            for line in result_simplified.stdout.strip().split('\n'):
+                logger.info(f"[display] {line}")
+        if result_simplified.stderr:
+            for line in result_simplified.stderr.strip().split('\n'):
+                logger.warning(f"[display] {line}")
 
         if result_simplified.returncode == 0:
             logger.info("Simplified display script executed successfully")
@@ -89,6 +114,14 @@ def call_display_script(
         result_external = subprocess.run(
             cmd_external, capture_output=True, text=True, timeout=300
         )
+
+        # 输出子进程日志
+        if result_external.stdout:
+            for line in result_external.stdout.strip().split('\n'):
+                logger.info(f"[display] {line}")
+        if result_external.stderr:
+            for line in result_external.stderr.strip().split('\n'):
+                logger.warning(f"[display] {line}")
 
         if result_external.returncode == 0:
             logger.info("External display script executed successfully")
@@ -146,6 +179,7 @@ def execute_task(config: dict) -> bool:
     display_model = get_display_model(config)
     output_dir = get_output_dir(config)
     image_url = get_image_url(config)
+    allow_wifi_off = get_allow_wifi_off(config)
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -155,11 +189,17 @@ def execute_task(config: dict) -> bool:
 
     if not download_with_retry(image_url, IMAGE_PATH, max_retries=3):
         logger.error("Failed to download image")
-        wifi_off()
+        if allow_wifi_off:
+            wifi_off()
+        else:
+            logger.info("WiFi keep-alive: skipping WiFi off")
         return False
 
-    if not wifi_off():
-        logger.warning("Failed to disable WiFi")
+    if allow_wifi_off:
+        if not wifi_off():
+            logger.warning("Failed to disable WiFi")
+    else:
+        logger.info("WiFi keep-alive mode enabled")
 
     if not call_display_script(display_model, IMAGE_PATH, output_dir, config):
         logger.error("Failed to display image")
@@ -178,9 +218,18 @@ def main():
 
     # 根据配置设置日志级别
     log_level = getattr(logging, get_log_level(config), logging.INFO)
+    log_file = get_log_file(config)
+
+    handlers = [logging.StreamHandler()]
+    if log_file:
+        from pathlib import Path
+        Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
+
     logging.basicConfig(
         level=log_level,
-        format="%(asctime)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=handlers
     )
 
     logger.info("Photo Painter Show - Main Program Started")

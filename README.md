@@ -82,7 +82,8 @@ mkdir -p output_dir
   "output_dir": "/home/pi/photo-painter-show/output_dir",
   "display_script_path": "/home/pi/Waveshare_E-Paper/RaspberryPi_JetsonNano/python/main.py",
   "log_level": "INFO",
-  "debug_mode": false
+  "debug_mode": false,
+  "allow_wifi_off": false
 }
 ```
 
@@ -98,6 +99,8 @@ mkdir -p output_dir
 | display_script_path | 墨水屏官方驱动脚本路径 | "" |
 | log_level | 日志级别: DEBUG, INFO, WARNING, ERROR | "INFO" |
 | debug_mode | 调试模式（预留） | false |
+| allow_wifi_off | 是否允许关闭WiFi以节省电量 | false |
+| rotate_display | 是否旋转180度显示 | false |
 
 ## 使用
 
@@ -146,18 +149,55 @@ RTC闹钟触发 → 系统启动
     ↓
 读取配置
     ↓
-WiFi开 → 下载图片 → WiFi关
+WiFi开 → 下载图片 → [WiFi关]  (根据 allow_wifi_off 配置)
     ↓
 调用显示脚本
     ↓
 rtcwake -m off  # 系统深度休眠
 ```
 
+## WiFi 控制
+
+### allow_wifi_off 配置
+
+| 配置值 | 行为 |
+|--------|------|
+| `false` (默认) | 不关闭 WiFi，保持网络连接 |
+| `true` | 关闭 WiFi 省电，适合无人值守模式 |
+
+> **注意**：远程调试时请设为 `false`，避免 SSH 连接断开。
+
 ## 省电说明
 
 - 系统使用 `rtcwake -m off` 实现深度休眠
 - 仅RTC模块供电，功耗极低
 - 定时时间到达后自动开机执行任务
+- 设置 `allow_wifi_off: true` 可进一步节省 WiFi 模块电量
+
+## 图片显示
+
+### 旋转配置
+
+如果屏幕方向不正确，可以通过 `rotate_display` 配置项旋转图片：
+
+| 配置值 | 效果 |
+|--------|------|
+| `false` (默认) | 正常显示 |
+| `true` | 旋转180度显示 |
+
+```json
+{
+  "rotate_display": true
+}
+```
+
+### 驱动路径
+
+简化版显示脚本会从 `./display/lib` 目录加载墨水屏驱动。如果驱动文件在其他位置，可以通过 `-d` 参数指定：
+
+```bash
+python3 display/display.py image.jpg -m epd7in3e -d /path/to/lib
+```
 
 ## 电源监控
 

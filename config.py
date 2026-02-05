@@ -66,3 +66,18 @@ def get_mode(config: Dict[str, Any]) -> str:
 def get_interval_minutes(config: Dict[str, Any]) -> int:
     """获取间隔模式的分钟数"""
     return config.get("interval_minutes", 60)
+
+
+def get_log_file(config: Dict[str, Any]) -> str:
+    """获取日志文件路径，空字符串表示不输出到文件"""
+    return config.get("log_file", "")
+
+
+def get_allow_wifi_off(config: Dict[str, Any]) -> bool:
+    """是否允许关闭WiFi（用于节能模式），默认为False不关闭"""
+    return config.get("allow_wifi_off", False)
+
+
+def get_rotate_display(config: Dict[str, Any]) -> bool:
+    """是否旋转180度显示"""
+    return config.get("rotate_display", False)

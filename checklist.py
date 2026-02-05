@@ -43,7 +43,7 @@ CHECKLIST = {
         "checks": [
             ("nmcli 可用", "command_exists nmcli", True),
             ("wifi_on() 返回 True", "wifi_on", True),
-            ("wifi_off() 返回 True", "wifi_off", True),
+            # ("wifi_off() 返回 True", "wifi_off", True),
         ],
     },
     "FETCHER": {
@@ -329,7 +329,7 @@ CHECK_FUNCTIONS = {
     "config_complete": config_complete,
     "command_exists nmcli": lambda: command_exists("nmcli"),
     "wifi_on": wifi_on,
-    "wifi_off": wifi_off,
+    # "wifi_off": wifi_off,
     "import requests": import_requests,
     "import fetcher": import_fetcher,
     "mock_download": mock_download,
