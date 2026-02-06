@@ -2,7 +2,7 @@
   "mode": "interval",
   "schedule": ["05:00", "13:00", "18:00"],
   "interval_minutes": 3,
-  "image_url": "http://192.168.3.48:3000/api/v1/poster/photos/3/poster?template=classic&outputType=epaper6&quantizer=euclidean&dither=true",
+  "image_url": "http://192.168.3.48:3000/api/v1/photos/3/poster?template=classic&fontId=%E9%9C%9E%E9%B9%9C%E6%96%87%E6%A5%B7&outputType=epaper6&quantizer=euclidean&dither=true",
   "display_model": "epd7in3e",
   "output_dir": "/home/pi/painter-show/pic",
   "display_script_path": "/home/pi/RPi_Zero_PhotoPainter/Waveshare_E-Paper/display_picture.py",

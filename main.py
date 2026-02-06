@@ -379,7 +379,13 @@ def main():
                     wake_timestamp = get_next_wake_time(schedule_list)
 
                 if execute_task(config, power_manager, power_tracker):
-                    run_rtcwake(wake_timestamp)
+                    rtcwake_success = run_rtcwake(wake_timestamp)
+                    if not rtcwake_success:
+                        logger.warning(
+                            "RTC wake scheduling failed, will retry in 30 seconds"
+                        )
+                        time.sleep(30)
+                        continue
 
                     logger.info("System suspending...")
                     sys.stdout.flush()
@@ -394,7 +400,15 @@ def main():
                             logger.warning(f"RTC 同步失败: {sync_msg}, 继续休眠")
 
                     os.system("sync")
-                    os.system("systemctl suspend")
+
+                    suspend_result = os.system("systemctl suspend")
+                    if suspend_result != 0:
+                        logger.warning(
+                            f"System suspend failed (exit code: {suspend_result}), skipping suspend"
+                        )
+                        logger.info("Continuing to next cycle...")
+                        time.sleep(10)
+                        continue
 
                     logger.info("System resumed from suspend")
                     time.sleep(5)
@@ -408,7 +422,13 @@ def main():
                     else:
                         schedule_list = get_schedule(config)
                         wake_timestamp = get_next_wake_time(schedule_list)
-                    run_rtcwake(wake_timestamp)
+                    rtcwake_success = run_rtcwake(wake_timestamp)
+                    if not rtcwake_success:
+                        logger.warning(
+                            "RTC wake scheduling failed, retrying in 30 seconds"
+                        )
+                        time.sleep(30)
+                        continue
 
                     if get_sync_before_suspend(config):
                         logger.info("正在同步系统时间到 RTC...")
@@ -419,7 +439,13 @@ def main():
                             logger.warning(f"RTC 同步失败: {sync_msg}, 继续休眠")
 
                     os.system("sync")
-                    os.system("systemctl suspend")
+                    suspend_result = os.system("systemctl suspend")
+                    if suspend_result != 0:
+                        logger.warning(
+                            f"System suspend failed (exit code: {suspend_result}), skipping suspend"
+                        )
+                        time.sleep(10)
+                        continue
 
         except KeyboardInterrupt:
             logger.info("Interrupted by user")
@@ -433,7 +459,11 @@ def main():
             else:
                 schedule_list = get_schedule(config)
                 wake_timestamp = get_next_wake_time(schedule_list)
-            run_rtcwake(wake_timestamp)
+            rtcwake_success = run_rtcwake(wake_timestamp)
+            if not rtcwake_success:
+                logger.warning("RTC wake scheduling failed, retrying in 30 seconds")
+                time.sleep(30)
+                continue
 
             if get_sync_before_suspend(config):
                 logger.info("正在同步系统时间到 RTC...")
@@ -444,7 +474,13 @@ def main():
                     logger.warning(f"RTC 同步失败: {sync_msg}, 继续休眠")
 
             os.system("sync")
-            os.system("systemctl suspend")
+            suspend_result = os.system("systemctl suspend")
+            if suspend_result != 0:
+                logger.warning(
+                    f"System suspend failed (exit code: {suspend_result}), skipping suspend"
+                )
+                time.sleep(10)
+                continue
 
     logger.info("Program exiting")
     sys.exit(0)

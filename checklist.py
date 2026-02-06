@@ -135,7 +135,6 @@ def config_complete():
             "schedule",
             "image_url",
             "display_model",
-            "work_dir",
             "output_dir",
         ]
         missing = [k for k in required_keys if k not in config]
