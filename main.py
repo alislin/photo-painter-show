@@ -320,11 +320,20 @@ def main():
         f"interval={get_interval_minutes(config)}min, display={get_display_model(config)}"
     )
 
-    MAINTENANCE_CHECK_INTERVAL = 30  # 充电状态下检测间隔（秒）
+    MAINTENANCE_CHECK_INTERVAL = 30  # 充电状态下维护检查间隔（秒）
     last_charging_state = None  # 记录上一次充电状态，用于状态变化检测
+    last_task_time = 0  # 记录上次执行主任务的时间戳
 
     while True:
         try:
+            current_time = time.time()
+            interval_minutes = get_interval_minutes(config)
+            interval_seconds = interval_minutes * 60
+            should_execute_task = (
+                last_task_time == 0 or
+                (current_time - last_task_time) >= interval_seconds
+            )
+
             # 检查充电状态
             is_charging = True  # 默认维护模式，防止无电源硬件时休眠无法唤醒
             if power_manager:
@@ -353,22 +362,33 @@ def main():
                 last_charging_state = False  # 标记已输出过日志
 
             if is_charging:
-                # 充电状态：执行任务后不休眠，继续检测
-                logger.info("Charging mode - executing task without suspend")
-                if execute_task(config, power_manager, power_tracker):
-                    logger.info(
-                        f"Task completed, checking again in {MAINTENANCE_CHECK_INTERVAL} seconds"
-                    )
-                    time.sleep(MAINTENANCE_CHECK_INTERVAL)
+                # 充电状态：维护模式，按配置的间隔执行主任务
+                if should_execute_task:
+                    logger.info(f"Charging mode - executing task (interval: {interval_minutes} min)")
+                    if execute_task(config, power_manager, power_tracker):
+                        last_task_time = current_time
+                        logger.info(
+                            f"Task completed, next execution in {interval_minutes} minutes"
+                        )
+                    else:
+                        logger.error("Task failed, will retry soon")
+                        time.sleep(10)
+                        continue
                 else:
-                    logger.error("Task failed, retrying in 30 seconds")
-                    time.sleep(30)
+                    # 未到执行时间，进行维护检查
+                    remaining = interval_seconds - (current_time - last_task_time)
+                    logger.debug(
+                        f"Charging mode - maintenance check, "
+                        f"next task in {remaining:.0f} seconds"
+                    )
+
+                # 充电状态下不休眠，每30秒检查一次状态
+                time.sleep(MAINTENANCE_CHECK_INTERVAL)
             else:
                 # 未充电：根据模式选择调度策略
                 mode = get_mode(config)
                 if mode == "interval":
                     # 间隔模式
-                    interval_minutes = get_interval_minutes(config)
                     wake_timestamp = calculate_next_interval_wake(interval_minutes)
                     logger.info(
                         f"Interval mode: waking every {interval_minutes} minutes"
@@ -379,6 +399,7 @@ def main():
                     wake_timestamp = get_next_wake_time(schedule_list)
 
                 if execute_task(config, power_manager, power_tracker):
+                    last_task_time = current_time  # 记录任务执行时间
                     rtcwake_success = run_rtcwake(wake_timestamp)
                     if not rtcwake_success:
                         logger.warning(
